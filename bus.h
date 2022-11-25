@@ -7,5 +7,5 @@ BYTE cpu_read(WORD addr);
 void cpu_write(WORD addr, BYTE data);
 
 void insert_cartridge();
-void reset();
-void clock();
+void reset_bus();
+void clock_bus();

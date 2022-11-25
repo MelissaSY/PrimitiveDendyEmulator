@@ -4,6 +4,7 @@ BYTE RAM[2048];
 
 long clock_counter = 0;
 
+
 BYTE cpu_read(WORD addr) {
 	BYTE data;
 	if (addr&0xFF00 <= 0x1F00) {
@@ -24,8 +25,18 @@ void cpu_write(WORD addr, BYTE data) {
 	}
 };
 
-void reset() 
+void reset_bus()
+{
+	reset_cpu();
+	clock_counter = 0;
+}
+
+void clock_bus()
 {
 
-	cpu_rese
+}
+
+void insert_cartridge() 
+{
+	ppu_connect_cartridge();
 }

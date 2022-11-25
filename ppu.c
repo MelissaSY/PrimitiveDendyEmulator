@@ -1,6 +1,7 @@
 #include "ppu.h"
 
-BYTE nametable[2048];
+BYTE nametable[2][1024];
+BYTE palette[32];
 
 BYTE ppu_read(WORD addr) 
 {
@@ -76,4 +77,14 @@ void ppu_bus_write(WORD addr, BYTE data)
 	case 0x0007:
 		break;
 	}
+}
+
+void ppu_connect_cartridge() 
+{
+
+}
+
+void ppu_clock()
+{
+
 }
