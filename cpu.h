@@ -26,9 +26,9 @@ struct reg {
 //struct for instruction table
 typedef struct instruction {
 	//instruction address
-	void (*instr)(void);
+	void (*instr)();
 	//adrressing mode
-	void (*mode)(void);
+	void (*mode)();
 	BYTE cycles_num;
 
 } instr_addr;

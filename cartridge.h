@@ -1,6 +1,8 @@
 #pragma once
 #include "ppu.h"
 #include "cpu.h"
+#include "NROM.h"
+#include "MMC1.h"
 
 //typedef struct cartridge {
 //	BYTE(*cart_ppu_read)(WORD addr);
@@ -10,8 +12,10 @@
 //	void (*cart_bus_write)(WORD addr, BYTE data);
 //} cartridge;
 
-BYTE cart_ppu_read(WORD addr);
-void cart_ppu_write(WORD addr, BYTE data);
+void read_cartridge(LPCWSTR path);
 
-BYTE cart_bus_read(WORD addr);
-void cart_bus_write(WORD addr, BYTE data);
+BOOL cart_ppu_read(WORD addr, BYTE* data);
+BOOL cart_ppu_write(WORD addr, BYTE data);
+
+BOOL cart_bus_read(WORD addr, BYTE* data);
+BOOL cart_bus_write(WORD addr, BYTE data);

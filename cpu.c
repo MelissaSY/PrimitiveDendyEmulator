@@ -18,17 +18,17 @@
 #define CARRY_FLAG		0
 
 //sl - shift left of the lower bit of byte to set the flag, b - byte with set lowest bit
-#define RET_FLAG(sl, b, flags)	flags & ~(1<<sl) | (b&0x01) << sl
+#define RET_FLAG(sl, b, flags)	((flags & ~(1<<sl)) | ((b&0x01) << sl))
 //gets flag shifting right the flags (return in lowest bit) 
-#define GET_FLAG(sr, flags)		(flags >> (7 - sr))&0x01
+#define GET_FLAG(sr, flags)		((flags >> (7 - sr))&0x01)
 
 int period, cycles_num;
 WORD cpu_addr, cpu_rel_addr;
 BYTE operationCode;
 instr_addr ia;
 
-void (*special_set)(void);
-void (*special_get)(void);
+void (*special_set)();
+void (*special_get)();
 
 void page_crossed(WORD prev_addr, WORD current_addr) {
 	if ((prev_addr & 0xFF00) != (prev_addr & 0xFF00))
@@ -483,7 +483,7 @@ void ind() {
 
 	cpu_addr = cpu_read(ptr);
 
-	if (ptr & 0x00FF == 0x00FF) {
+	if ((ptr & 0x00FF) == 0x00FF) {
 		cpu_addr |= cpu_read(ptr & 0xFF00) << 8;
 	}
 	else {

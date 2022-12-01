@@ -1,5 +1,5 @@
 #pragma once
-#include "bus.h";
+#include "bus.h"
 
 BYTE ppu_read(WORD addr);
 void ppu_write(WORD addr, BYTE data);
@@ -7,5 +7,5 @@ void ppu_write(WORD addr, BYTE data);
 BYTE ppu_bus_read(WORD addr);
 void ppu_bus_write(WORD addr, BYTE data);
 
-void ppu_connect_cartridge();
-void clock_ppu();
+void ppu_connect_cartridge(LPCWSTR filepath);
+void ppu_read_pallete(LPCWSTR filepath);
