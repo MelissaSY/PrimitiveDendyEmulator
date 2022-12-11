@@ -23,8 +23,6 @@ typedef enum console_type {
 
 BOOL SRAM; //battery-backed memory, prg-ram, sram
 
-BYTE* PRG;
-BYTE* CHR;
 
 WORD mapper_id = 0;
 BYTE n_prg_banks = 0;
@@ -72,7 +70,6 @@ typedef struct header
 	BYTE flags_7;
 
 	BYTE flags_8; //PRG RAM size ?
-	BYTE flags_9;
 	BYTE tv_system_1;
 	BYTE tv_system_2;
 	char unused[5];
@@ -148,7 +145,7 @@ void read_cartridge(LPCWSTR path)
 	if (h_file != INVALID_HANDLE_VALUE)
 	{
 		ReadFile(h_file, &header, sizeof(header), &bytes_read, NULL);
-		bytes_read = 0;
+		//bytes_read = 0;
 		if (header.flags_6 & 0x04) 
 		{
 			SetFilePointer(h_file, 512, NULL, FILE_CURRENT);
@@ -171,11 +168,20 @@ void read_cartridge(LPCWSTR path)
 		case iNES:
 			n_prg_banks = header.prg_rom_size;
 			PRG = (BYTE*)calloc(16 * 1024 * n_prg_banks, sizeof(BYTE));
-			ReadFile(h_file, &PRG, 16 * 1024 * n_prg_banks, &bytes_read, NULL);
+			ReadFile(h_file, PRG, 16 * 1024 * n_prg_banks, &bytes_read, NULL);
 
+			DWORD er = GetLastError();
 			n_chr_banks = header.chr_rom_size;
-			CHR = (BYTE*)calloc(8 * 1024 * n_chr_banks, sizeof(BYTE));
-			ReadFile(h_file, &CHR, 8 * 1024 * n_chr_banks, &bytes_read, NULL);
+			if (n_chr_banks) 
+			{
+				CHR = (BYTE*)calloc(8 * 1024 * n_chr_banks, sizeof(BYTE));
+				ReadFile(h_file, CHR, 8 * 1024 * n_chr_banks, &bytes_read, NULL);
+			}
+			else
+			{			
+				CHR = (BYTE*)calloc(8 * 1024, sizeof(BYTE));
+				ReadFile(h_file, CHR, 8 * 1024, &bytes_read, NULL);
+			}
 			break;
 		default:
 			break;
@@ -195,6 +201,7 @@ void read_cartridge(LPCWSTR path)
 
 	}
 	CloseHandle(h_file);
+
 }
 
 

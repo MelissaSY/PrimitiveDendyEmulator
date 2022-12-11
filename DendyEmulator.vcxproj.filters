@@ -19,6 +19,9 @@
     <Filter Include="palletes">
       <UniqueIdentifier>{9eee3fb7-cb32-4905-8c64-7c9bc2c46686}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Visualize helper">
+      <UniqueIdentifier>{74af3344-ca77-4ddb-814a-2b8f7b60c9ea}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cpu.c">
@@ -45,6 +48,12 @@
     <ClCompile Include="MMC1.c">
       <Filter>Mappers</Filter>
     </ClCompile>
+    <ClCompile Include="ppu_helper.c">
+      <Filter>Visualize helper</Filter>
+    </ClCompile>
+    <ClCompile Include="Logger.c">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cpu.h">
@@ -70,6 +79,12 @@
     </ClInclude>
     <ClInclude Include="MMC1.h">
       <Filter>Mappers</Filter>
+    </ClInclude>
+    <ClInclude Include="ppu_helper.h">
+      <Filter>Visualize helper</Filter>
+    </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

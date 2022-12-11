@@ -3,9 +3,7 @@
 
 //does PHP really push status on status on stack with break flag set no matter what? 
 //does PLP change break flag?
-//wrong CMPs realisation 
-//JSR & RTS ??		
-
+//while perfoming tests the interrupt bit is set why?
 //change all bus_read/bus_write in instructions to special_get/slecial_set later on, identiify all gets/sets in addressing modes
 
 #define NEG_FLAG		7
@@ -20,9 +18,10 @@
 //sl - shift left of the lower bit of byte to set the flag, b - byte with set lowest bit
 #define RET_FLAG(sl, b, flags)	((flags & ~(1<<sl)) | ((b&0x01) << sl))
 //gets flag shifting right the flags (return in lowest bit) 
-#define GET_FLAG(sr, flags)		((flags >> (7 - sr))&0x01)
+#define GET_FLAG(sr, flags)		((flags >> (sr))&0x01)
 
-int period, cycles_num;
+ULONG cpu_cycles_num, cpu_clock_counter;
+int period;
 WORD cpu_addr, cpu_rel_addr;
 BYTE operationCode;
 instr_addr ia;
@@ -33,22 +32,18 @@ void (*special_get)();
 void page_crossed(WORD prev_addr, WORD current_addr) {
 	if ((prev_addr & 0xFF00) != (prev_addr & 0xFF00))
 	{
-		cycles_num++;
+		cpu_cycles_num++;
 	}
-}
-//special get
-void bus_get() {
-	cpu_operand = cpu_read(cpu_addr);
 }
 //special set
 void bus_set() {
 	cpu_write(cpu_addr, cpu_operand);
 }
-void accumulator_get() {
-	cpu_operand = cpu_reg.A;
-}
 void accumulator_set() {
 	cpu_reg.A = cpu_operand;
+}
+void ZFlagSetWord(WORD res) {
+	cpu_reg.P = RET_FLAG(ZERO_FLAG, ~(res || 0), cpu_reg.P);
 }
 void ZFlagSet(BYTE res) {
 	cpu_reg.P = RET_FLAG(ZERO_FLAG, ~(res || 0), cpu_reg.P);
@@ -65,7 +60,7 @@ BYTE CVFlagSet(WORD res, BYTE operand_1, BYTE operand_2) {
 	cpu_reg.P = RET_FLAG(CARRY_FLAG, res >> 8, cpu_reg.P);
 	//Overflow flag
 	cpu_reg.P = RET_FLAG(OVERFLOW_FLAG, ((res ^ operand_1) & (res ^ operand_2) & 0x80) >> 7, cpu_reg.P);
-	return res & 0x0011;
+	return res & 0x00FF;
 }
 void pushS(BYTE operand) {
 	cpu_write(0x0100 | cpu_reg.SP, operand);
@@ -77,59 +72,76 @@ BYTE pullS() {
 //////////////////////////////////////////////////////////////////////
 //Logical and arithmetic commands
 void ORA() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	cpu_reg.A |= cpu_operand;
 	NZFlagSet(cpu_reg.A);
 }
 void AND() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	cpu_reg.A &= cpu_operand;
 	NZFlagSet(cpu_reg.A);
 }
 void EOR() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	cpu_reg.A ^= cpu_operand;
 	NZFlagSet(cpu_reg.A);
 }
 void ADC() {
-	cpu_operand = cpu_read(cpu_addr);
-	WORD res = cpu_reg.A + cpu_operand + ((cpu_reg.P >> (7 - CARRY_FLAG)) & 0x01);
+	//cpu_operand = cpu_read(cpu_addr);
+	WORD res = cpu_reg.A + cpu_operand + ((cpu_reg.P >> CARRY_FLAG) & 0x01);
 	cpu_reg.A = CVFlagSet(res, cpu_reg.A, cpu_operand);
+	NZFlagSet(cpu_reg.A);
 }
 void SBC() {
-	cpu_operand = cpu_read(cpu_addr);
-	WORD res = cpu_reg.A - cpu_operand - ~(cpu_reg.P >> (7 - CARRY_FLAG)) & 0x01;
+
+	cpu_operand ^= 0xFF;
+	BYTE res = cpu_reg.A + cpu_operand + ((cpu_reg.P >> CARRY_FLAG) & 0x01);
+	WORD wordRes = cpu_reg.A + cpu_operand + ((cpu_reg.P >> CARRY_FLAG) & 0x01);
+	NZFlagSet(res);
+	cpu_reg.A = CVFlagSet(wordRes, cpu_reg.A, cpu_operand);
+
+	//cpu_reg.P = RET_FLAG(CARRY_FLAG, cpu_reg.P >> ZERO_FLAG, cpu_reg.P)
+	//	| RET_FLAG(CARRY_FLAG, ~(wordRes >> 8), cpu_reg.P);
+
+	//cpu_reg.A = res;
+
+	/*WORD res = cpu_reg.A - cpu_operand - ~(cpu_reg.P >> CARRY_FLAG) & 0x01;
 	cpu_reg.A = CVFlagSet(res, cpu_reg.A, cpu_operand);
+	`
+	cpu_reg.P = RET_FLAG(CARRY_FLAG, cpu_reg.P >> ZERO_FLAG, cpu_reg.P)
+		| RET_FLAG(CARRY_FLAG, ~(res >> 8), cpu_reg.P);
+
+	NZFlagSet(cpu_reg.A);*/
 }
 void CMP() {
-	cpu_operand = cpu_read(cpu_addr);
-	WORD res = cpu_reg.A - cpu_operand;
-	cpu_reg.A = res & 0x0011;
-	NZFlagSet(cpu_reg.A);
+	//cpu_operand = cpu_read(cpu_addr);
+	BYTE res = cpu_reg.A - cpu_operand;
+	WORD wordRes = cpu_reg.A - cpu_operand;
+	NZFlagSet(res);
 
 	cpu_reg.P = RET_FLAG(CARRY_FLAG, cpu_reg.P >> ZERO_FLAG, cpu_reg.P) 
-		| RET_FLAG(CARRY_FLAG, res >> 8, cpu_reg.P);
+		| RET_FLAG(CARRY_FLAG, ~(wordRes >> 8), cpu_reg.P);
 }
 void CPX() {
-	cpu_operand = cpu_read(cpu_addr);
-	WORD res = cpu_reg.X - cpu_operand;
-	cpu_reg.X = res & 0x0011;
-	NZFlagSet(cpu_reg.X);
+	//cpu_operand = cpu_read(cpu_addr);
+	BYTE res = cpu_reg.X - cpu_operand;
+	WORD wordRes = cpu_reg.X - cpu_operand;
+	NZFlagSet(res);
 
 	cpu_reg.P = RET_FLAG(CARRY_FLAG, cpu_reg.P >> ZERO_FLAG, cpu_reg.P)
-		| RET_FLAG(CARRY_FLAG, res >> 8, cpu_reg.P);
+		| RET_FLAG(CARRY_FLAG, ~(wordRes >> 8), cpu_reg.P);
 }
 void CPY() {
-	cpu_operand = cpu_read(cpu_addr);
-	WORD res = cpu_reg.Y - cpu_operand;
-	cpu_reg.Y = res & 0x0011;
-	NZFlagSet(cpu_reg.Y);
+	//cpu_operand = cpu_read(cpu_addr);
+	BYTE res = cpu_reg.Y - cpu_operand;
+	WORD wordRes = cpu_reg.Y - cpu_operand;
+	NZFlagSet(res);
 
 	cpu_reg.P = RET_FLAG(CARRY_FLAG, cpu_reg.P >> ZERO_FLAG, cpu_reg.P)
-		| RET_FLAG(CARRY_FLAG, res >> 8, cpu_reg.P);
+		| RET_FLAG(CARRY_FLAG, ~(wordRes >> 8), cpu_reg.P);
 }
 void DEC() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	cpu_operand--;
 	NZFlagSet(cpu_operand);
 	cpu_write(cpu_addr, cpu_operand);
@@ -143,7 +155,7 @@ void DEY() {
 	NZFlagSet(cpu_reg.Y);
 }
 void INC() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	cpu_operand++;
 	NZFlagSet(cpu_operand);
 	cpu_write(cpu_addr, cpu_operand);
@@ -156,42 +168,51 @@ void INY() {
 	cpu_reg.Y++;
 	NZFlagSet(cpu_reg.Y);
 }
-void ASL() {
-	cpu_operand = cpu_read(cpu_addr);
-	WORD res = cpu_operand << 1;
-	cpu_reg.P = RET_FLAG(CARRY_FLAG, res >> 8, cpu_reg.P);
-	cpu_operand = res & 0x0011;
-	NZFlagSet(cpu_operand);
-	cpu_write(cpu_addr, cpu_operand);
 
+//shift
+void ASL() {
+	//cpu_operand = cpu_read(cpu_addr);
+	WORD res = (cpu_operand << 1)&0xFFFE;
+	cpu_reg.P = RET_FLAG(CARRY_FLAG, res >> 8, cpu_reg.P);
+	cpu_operand = res & 0x00FF;
+	NZFlagSet(cpu_operand);
+	special_set(cpu_operand);
+	//cpu_write(cpu_addr, cpu_operand);
 }
+//shift
 void ROL() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	BYTE lastBit = (cpu_operand & 0x80) >> 7;
 	cpu_operand = (cpu_operand << 1) | (cpu_reg.P >> CARRY_FLAG) & 0x01;
 	cpu_reg.P = RET_FLAG(CARRY_FLAG, lastBit, cpu_reg.P);
 	NZFlagSet(cpu_operand);
-	cpu_write(cpu_addr, cpu_operand);
+	special_set(cpu_operand);
+	//cpu_write(cpu_addr, cpu_operand);
 }
+//shift
 void LSR() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	BYTE firstBit = cpu_operand & 0x01;
 	cpu_operand = (cpu_operand >> 1);
 	cpu_reg.P = RET_FLAG(CARRY_FLAG, firstBit, cpu_reg.P);
 	NZFlagSet(cpu_operand);
-	cpu_write(cpu_addr, cpu_operand);
+	//cpu_write(cpu_addr, cpu_operand);
+	special_set(cpu_operand);
 }
+//shift
 void ROR() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	BYTE firstBit = cpu_operand & 0x01;
 	cpu_operand = (cpu_operand >> 1) | ((cpu_reg.P << (7 - CARRY_FLAG)) & 0x80);
 	cpu_reg.P = RET_FLAG(CARRY_FLAG, firstBit, cpu_reg.P);
 	NZFlagSet(cpu_operand);
-	cpu_write(cpu_addr, cpu_operand);
+
+	special_set(cpu_operand);
+	//cpu_write(cpu_addr, cpu_operand);
 }
 //Move commands
 void LDA() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	cpu_reg.A = cpu_operand;
 	NZFlagSet(cpu_reg.A);
 }
@@ -199,7 +220,7 @@ void STA() {
 	cpu_write(cpu_addr, cpu_reg.A);
 }
 void LDX() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	cpu_reg.X = cpu_operand;
 	NZFlagSet(cpu_reg.X);
 }
@@ -207,7 +228,7 @@ void STX() {
 	cpu_write(cpu_addr, cpu_reg.X);
 }
 void LDY() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	cpu_reg.Y = cpu_operand;
 	NZFlagSet(cpu_reg.Y);
 }
@@ -246,6 +267,8 @@ void PHA() {
 }
 void PLP() {
 	cpu_reg.P = pullS();
+	cpu_reg.P = RET_FLAG(BREAK_FLAG, 0x00, cpu_reg.P);
+	cpu_reg.P = RET_FLAG(RESERVED_FLAG, 0x01, cpu_reg.P);
 }
 void PHP() {
 	pushS(cpu_reg.P);
@@ -253,9 +276,9 @@ void PHP() {
 //Jump/Flag commands
 void branch(BYTE flag, BYTE value) {
 	if (GET_FLAG(flag, cpu_reg.P) == value) {
-		cycles_num++;
+		cpu_cycles_num++;
 		page_crossed(cpu_reg.PC.W, cpu_rel_addr);
-		cpu_reg.PC.W = cpu_rel_addr;
+		cpu_reg.PC.W += cpu_rel_addr;
 	}
 }
 void BPL() {
@@ -284,24 +307,26 @@ void BEQ() {
 }
 void BRK() {
 	cpu_reg.PC.W++;
+
+	//cpu_reg.P = RET_FLAG(INTERRUPT_FLAG, 0x01, cpu_reg.P);
 	pushS(cpu_reg.PC.B.h);
 	pushS(cpu_reg.PC.B.l);
 
-	cpu_reg.P = RET_FLAG(INTERRUPT_FLAG, 0x01, cpu_reg.P);
-
 	pushS(RET_FLAG(BREAK_FLAG, 0x01, cpu_reg.P));
 
-	cpu_reg.PC.B.h = cpu_read(0xFFFE);
-	cpu_reg.PC.B.l = cpu_read(0xFFFF);
+	cpu_reg.PC.B.h = cpu_read(0xFFFF);
+	cpu_reg.PC.B.l = cpu_read(0xFFFE);
 }
 void RTI() {
 	cpu_reg.P = pullS();
 	cpu_reg.P = RET_FLAG(BREAK_FLAG, 0x00, cpu_reg.P);
+	cpu_reg.P = RET_FLAG(RESERVED_FLAG, 0x01, cpu_reg.P);
 
 	cpu_reg.PC.B.l = pullS();
 	cpu_reg.PC.B.h = pullS();
 }
 void JSR() {
+	cpu_reg.PC.W--;
 	pushS(cpu_reg.PC.B.h);
 	pushS(cpu_reg.PC.B.l);
 
@@ -316,7 +341,7 @@ void JMP() {
 	cpu_reg.PC.W = cpu_addr;
 }
 void BIT() {
-	cpu_operand = cpu_read(cpu_addr);
+	//cpu_operand = cpu_read(cpu_addr);
 	ZFlagSet(cpu_operand & cpu_reg.A);
 	cpu_reg.P = RET_FLAG(NEG_FLAG, cpu_operand >> 7, cpu_reg.P);
 	cpu_reg.P = RET_FLAG(OVERFLOW_FLAG, cpu_operand >> 6, cpu_reg.P);
@@ -412,7 +437,9 @@ void SHX() {
 //address modes
 
 void imm() {
-	cpu_addr = cpu_read(cpu_reg.PC.W);
+	cpu_operand = cpu_read(cpu_reg.PC.W);
+	log_byte(cpu_operand);
+	log(L"\t");
 	cpu_reg.PC.W++;
 }
 void abs_() {
@@ -420,6 +447,13 @@ void abs_() {
 	cpu_reg.PC.W++;
 	cpu_addr |= cpu_read(cpu_reg.PC.W) << 8;
 	cpu_reg.PC.W ++;
+
+	log_byte(cpu_addr & 0x00FF);
+	log_byte((cpu_addr >> 8) & 0x00FF);
+	log(L"\t");
+
+	cpu_operand = cpu_read(cpu_addr);
+	special_set = bus_set;
 }
 void absX() {
 	cpu_addr = cpu_read(cpu_reg.PC.W);
@@ -427,12 +461,16 @@ void absX() {
 	cpu_addr |= cpu_read(cpu_reg.PC.W) << 8;
 	cpu_reg.PC.W++;
 
+	log_byte(cpu_addr&0x00FF);
+	log_byte((cpu_addr >> 8) & 0x00FF);
+	log(L"\t");
+
 	WORD prev_addr = cpu_addr;
 	cpu_addr += cpu_reg.X;
 
 	page_crossed(prev_addr, cpu_addr);
 
-	special_get = bus_get;
+	cpu_operand = cpu_read(cpu_addr);
 	special_set = bus_set;
 }
 void absY() {
@@ -441,39 +479,70 @@ void absY() {
 	cpu_addr |= (cpu_read(cpu_reg.PC.W) << 8);
 	cpu_reg.PC.W++;
 
+	log_byte(cpu_addr & 0x00FF);
+	log_byte((cpu_addr >> 8) & 0x00FF);
+	log(L"\t");
+
 	WORD prev_addr = cpu_addr;
 	cpu_addr += cpu_reg.Y;
 
 	page_crossed(prev_addr, cpu_addr);
 
-	special_get = bus_get;
+	cpu_operand = cpu_read(cpu_addr);
 	special_set = bus_set;
 }
 void zpg() {
 	cpu_addr = cpu_read(cpu_reg.PC.W) & 0x00FF;
+
+	log_byte(cpu_addr & 0x00FF);
+	log(L"\t");
+
 	cpu_reg.PC.W++;
 
-	special_get = bus_get;
+	cpu_operand = cpu_read(cpu_addr);
 	special_set = bus_set;
 }
 void zpgX() {
-	cpu_addr = (cpu_read(cpu_reg.PC.W) + cpu_reg.X) & 0x00FF;
+	cpu_addr = cpu_read(cpu_reg.PC.W);
+
+	log_byte(cpu_addr & 0x00FF);
+	log(L"\t");
+
+	cpu_addr = (cpu_addr + cpu_reg.X) & 0x00FF;
+
 	cpu_reg.PC.W++;
 
-	special_get = bus_get;
+	log_byte(cpu_addr & 0x00FF);
+	log(L"\t");
+
+	cpu_operand = cpu_read(cpu_addr);
 	special_set = bus_set;
 }
 void zpgY() {
-	cpu_addr = (cpu_read(cpu_reg.PC.W) + cpu_reg.Y) & 0x00FF;
+	cpu_addr = cpu_read(cpu_reg.PC.W);
+
+	log_byte(cpu_addr & 0x00FF);
+	log(L"\t");
+
+	cpu_addr = (cpu_addr + cpu_reg.Y) & 0x00FF;
 	cpu_reg.PC.W++;
+
+
+	cpu_operand = cpu_read(cpu_addr);
+	special_set = bus_set;
 }
+//for branches only, don't touch
 void rel() {
 	cpu_rel_addr = cpu_read(cpu_reg.PC.W);
 	cpu_reg.PC.W++;
 
-	if (cpu_rel_addr & 0x80) {
+	log_byte(cpu_rel_addr & 0x00FF);
+	log(L"\t");
+
+	if (cpu_rel_addr & 0x0080) {
 		cpu_rel_addr |= 0xFF00;
 	}
+
 }
 void ind() {
 	WORD ptr = cpu_read(cpu_reg.PC.W);
@@ -490,16 +559,29 @@ void ind() {
 		ptr++;
 		cpu_addr |= (cpu_read(ptr) << 8);
 	}
+	log_word(cpu_addr);
+	log_byte((cpu_addr >> 8) & 0x00FF);
+	log_byte(cpu_addr & 0x00FF);
+	log("\t");
+
+	cpu_operand = cpu_read(cpu_addr);
+	special_set = bus_set;
 }
 void indX() {
-	BYTE temp_addr = cpu_reg.X + cpu_read(cpu_reg.PC.W);
+	BYTE temp_addr = cpu_read(cpu_reg.PC.W);
+	log_byte(temp_addr);
+	temp_addr += cpu_reg.X;
 	cpu_reg.PC.W++;
 	cpu_addr = cpu_read(temp_addr & 0xFF);
 	temp_addr++;
 	cpu_addr |= (cpu_read(temp_addr & 0xFF) << 8);
+
+	cpu_operand = cpu_read(cpu_addr);
+	special_set = bus_set;
 }
 void indY() {
 	BYTE temp_addr = cpu_read(cpu_reg.PC.W);
+	log_byte(temp_addr);
 	cpu_reg.PC.W++;
 	cpu_addr = cpu_read(temp_addr & 0xFF);
 	temp_addr++;
@@ -507,13 +589,19 @@ void indY() {
 
 	page_crossed(cpu_addr, cpu_addr + cpu_reg.Y);
 	cpu_addr += cpu_reg.Y;
+
+	cpu_operand = cpu_read(cpu_addr);
+	special_set = bus_set;
 }
 
-void impl() { }
+void impl() {
+	log(L"\t\t");
+}
 void accum()
 {
-	special_get = accumulator_get;
+	cpu_operand = cpu_reg.A;
 	special_set = accumulator_set;
+
 }
 
 //no addressing mode
@@ -523,8 +611,8 @@ void noAM() { }
 instr_addr _instr_mode[0x10][0x10] = {
 //		    0			     1			2		     3			   4		   5		     6		      7			   8			9		      A			     B		      C		       D		   E		  F  
 /*0*/{BRK, impl,7, ORA, indX, 6, JAM, noAM, 0, SLO, indX, 8, NOP, zpg, 3, ORA, zpg, 3, ASL, zpg, 5, SLO, zpg, 5, PHP, impl, 3, ORA, imm, 2, ASL, accum, 2, ANC, imm, 2, NOP, abs_,4, ORA, abs_,4, ASL, abs_,6, SLO, abs_,6},
-/*1*/{BPL, rel, 2, ORA, indY, 5, JAM, noAM, 0, SLO, indY, 8, NOP,zpgX, 4, ORA,zpgX, 4, ASL, zpg, 6, SLO,zpgX, 6, CLC, impl, 2, ORA,absY, 4, NOP, impl,  2, SLO,absY, 7, NOP,absX, 4, ORA,absX, 4, ASL,absX, 7, SLO,absX, 7},
-/*2*/{JSR, abs_,6, AND, indY, 6, JAM, noAM, 0, RLA, indX, 8, BIT, zpg, 3, AND, zpg, 3, ROL, zpg, 5, RLA, zpg, 5, PLP, impl, 4, AND, imm, 2, ROL, accum, 2, ANC, imm, 2, BIT, abs_,4, AND, abs_,4, ROL, abs_,6, RLA, abs_,6},
+/*1*/{BPL, rel, 2, ORA, indY, 5, JAM, noAM, 0, SLO, indY, 8, NOP,zpgX, 4, ORA,zpgX, 4, ASL,zpgX, 6, SLO,zpgX, 6, CLC, impl, 2, ORA,absY, 4, NOP, impl,  2, SLO,absY, 7, NOP,absX, 4, ORA,absX, 4, ASL,absX, 7, SLO,absX, 7},
+/*2*/{JSR, abs_,6, AND, indX, 6, JAM, noAM, 0, RLA, indX, 8, BIT, zpg, 3, AND, zpg, 3, ROL, zpg, 5, RLA, zpg, 5, PLP, impl, 4, AND, imm, 2, ROL, accum, 2, ANC, imm, 2, BIT, abs_,4, AND, abs_,4, ROL, abs_,6, RLA, abs_,6},
 /*3*/{BMI, rel, 2, AND, indY, 5, JAM, noAM, 0, RLA, indY, 8, NOP,zpgX, 4, AND,zpgX, 4, ROL,zpgX, 6, RLA,zpgX, 6, SEC, impl, 2, AND,absY, 4, NOP, impl,  2, RLA,absY, 7, NOP,absX, 4, AND,absX, 4, ROL,absX, 7, RLA,absX, 7},
 /*4*/{RTI, impl,6, EOR, indX, 6, JAM, noAM, 0, SRE, indX, 8, NOP, zpg, 3, EOR, zpg, 3, LSR, zpg, 5, SRE, zpg, 5, PHA, impl, 3, EOR, imm, 2, LSR, accum, 2, ALR, imm, 2, JMP, abs_,3, EOR, abs_,4, LSR, abs_,6, SRE, abs_,6},
 /*5*/{BVC, rel, 2, EOR, indY, 5, JAM, noAM, 0, SRE, indY, 8, NOP,zpgX, 4, EOR,zpgX, 4, LSR,zpgX, 6, SRE,zpgX, 6, CLI, impl, 2, EOR,absY, 4, NOP, impl,  2, SRE,absY, 7, NOP,absX, 4, EOR,absX, 4, LSR,absX, 7, SRE, abs_,7},
@@ -545,22 +633,46 @@ void reset_cpu() {
 	cpu_reg.X = 0;
 	cpu_reg.Y = 0;
 	cpu_reg.P = 0;
-	cpu_reg.P |= 1 << RESERVED_FLAG | 1 << ZERO_FLAG;
-	cpu_reg.SP = 0xFF;
-	cpu_reg.PC.B.l = cpu_read(0xFFFC);
-	cpu_reg.PC.B.h = cpu_read(0xFFFD);
+	cpu_reg.P |= 1 << RESERVED_FLAG | 1 << ZERO_FLAG | 1 << INTERRUPT_FLAG;
+	cpu_reg.SP = 0xFD;
+	/*cpu_reg.PC.B.l = cpu_read(0xFFFC);
+	cpu_reg.PC.B.h = cpu_read(0xFFFD);*/
+	cpu_reg.PC.W = 0xC000;
+	//cpu_reg.PC.W = 0x0C00;
+
+	cpu_cycles_num = 8;
 	//Frame period must be added
 }
 
 void clock_cpu() {
-	operationCode = cpu_read(cpu_reg.PC.W++);
-	ia = _instr_mode[operationCode & 0xF0][operationCode & 0x0F];
-	ia.mode();
-	ia.instr();
-}
+	if (cpu_cycles_num == 0)
+	{
+		operationCode = cpu_read(cpu_reg.PC.W++);
 
-void execute_cpu() {
+		log_word(cpu_reg.PC.W - 1);
+		log_byte(operationCode);
+		ia = _instr_mode[(operationCode >> 4) & 0x0F][operationCode & 0x0F];
 
+		cpu_cycles_num = ia.cycles_num;
+
+		ia.mode();
+		ia.instr();
+
+		log(L"\tA:");
+		log_byte(cpu_reg.A);
+		log(L"X:");
+		log_byte(cpu_reg.X);
+		log(L"Y:");
+		log_byte(cpu_reg.Y);
+		log(L"P:");
+		log_byte(cpu_reg.P);
+		log(L"SP:");
+		log_byte(cpu_reg.SP);
+		log_new_line();
+	}
+	cpu_clock_counter++;
+	
+	cpu_cycles_num--;
 }
 
 void nmi_cpu() {
@@ -574,8 +686,9 @@ void nmi_cpu() {
 
 	cpu_reg.PC.B.l = cpu_read(0xFFFA);
 	cpu_reg.PC.B.h = cpu_read(0xFFFB);
-	cycles_num = 8;
+	cpu_cycles_num = 8;
 }
+
 void irq_cpu() {
 	if (GET_FLAG(INTERRUPT_FLAG, cpu_reg.P) & 0x01) {
 		pushS(cpu_reg.PC.B.h);
@@ -588,6 +701,6 @@ void irq_cpu() {
 
 		cpu_reg.PC.B.l = cpu_read(0xFFFE);
 		cpu_reg.PC.B.h = cpu_read(0xFFFF);
-		cycles_num = 7;
+		cpu_cycles_num = 7;
 	}
 }

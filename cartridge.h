@@ -1,6 +1,5 @@
 #pragma once
-#include "ppu.h"
-#include "cpu.h"
+#include "bus.h"
 #include "NROM.h"
 #include "MMC1.h"
 
@@ -11,6 +10,10 @@
 //	BYTE (*cart_bus_read)(WORD addr);
 //	void (*cart_bus_write)(WORD addr, BYTE data);
 //} cartridge;
+
+
+BYTE* PRG;
+BYTE* CHR;
 
 void read_cartridge(LPCWSTR path);
 

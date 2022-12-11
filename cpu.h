@@ -35,5 +35,7 @@ typedef struct instruction {
 
 BYTE cpu_operand;
 
+void irq_cpu();
+void nmi_cpu();
 void reset_cpu();
 void clock_cpu();
