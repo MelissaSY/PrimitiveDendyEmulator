@@ -1,18 +1,15 @@
 #include "cartridge.h"
 #include <windows.h>
 
-typedef enum file_type {
-	NES2_0,
-	archaic_iNES,
-	iNES,
-	iNES0_7
-} file_type;
+BOOL SRAM; //battery-backed memory, prg-ram, sram
 
-typedef enum mirroring {
-	vertical,
-	horizontal,
-	four_screen
-} mirroring;
+
+WORD mapper_id = 0;
+BYTE n_prg_banks = 0;
+BYTE n_chr_banks = 0;
+
+mirroring mirroring_type;
+
 
 typedef enum console_type {
 	computer = 0,
@@ -21,12 +18,14 @@ typedef enum console_type {
 	extended = 3
 } console_type;
 
-BOOL SRAM; //battery-backed memory, prg-ram, sram
 
 
-WORD mapper_id = 0;
-BYTE n_prg_banks = 0;
-BYTE n_chr_banks = 0;
+typedef enum file_type {
+	NES2_0,
+	archaic_iNES,
+	iNES,
+	iNES0_7
+} file_type;
 
 
 mapper current_mapper;
@@ -129,7 +128,6 @@ void read_cartridge(LPCWSTR path)
 	DWORD bytes_read;
 	header header;
 	file_type file_type;
-	mirroring mirroring;
 	console_type console_type;
 
 	if (PRG != NULL) 
@@ -155,7 +153,7 @@ void read_cartridge(LPCWSTR path)
 
 		file_type = detect_file_type(header.flags_7);
 		console_type = detect_console_type(header.flags_7);
-		mirroring = detect_mirroring(header.flags_6);
+		mirroring_type = detect_mirroring(header.flags_6);
 		SRAM = detect_SRAM(header.flags_6);
 
 		switch (file_type)

@@ -307,8 +307,6 @@ void BEQ() {
 }
 void BRK() {
 	cpu_reg.PC.W++;
-
-	//cpu_reg.P = RET_FLAG(INTERRUPT_FLAG, 0x01, cpu_reg.P);
 	pushS(cpu_reg.PC.B.h);
 	pushS(cpu_reg.PC.B.l);
 
@@ -373,37 +371,44 @@ void JAM() {
 
 }
 void SLO() {
-
+	ASL();
+	ORA();
 }
 void ANC() {
 
 }
 void RLA() {
-
+	ROR();
+	ADC();
 }
 void SRE() {
-
+	LSR();
+	EOR();
 }
 void ALR() {
 
 }
 void RRA() {
-
+	ROR();
+	ADC();
 }
 void SAX() {
-
+	special_set(cpu_operand & cpu_reg.A);
 }
 void SHA() {
 
 }
 void LAX() {
-
+	LDA();
+	LDX();
 }
 void DCP() {
-
+	DEC();
+	CMP();
 }
 void ISC() {
-
+	INC();
+	SBC();
 }
 void ARR() {
 
@@ -424,7 +429,8 @@ void SBX() {
 
 }
 void USBC() {
-
+	SBC();
+	NOP();
 }
 void SHY() {
 
@@ -545,24 +551,23 @@ void rel() {
 
 }
 void ind() {
-	WORD ptr = cpu_read(cpu_reg.PC.W);
+	WORD temp_addr = cpu_read(cpu_reg.PC.W);
 	cpu_reg.PC.W++;
-	ptr |= (cpu_read(cpu_reg.PC.W) << 8);
+	temp_addr |= (cpu_read(cpu_reg.PC.W) << 8);
 	cpu_reg.PC.W++;
 
-	cpu_addr = cpu_read(ptr);
+	cpu_addr = cpu_read(temp_addr);
 
-	if ((ptr & 0x00FF) == 0x00FF) {
-		cpu_addr |= cpu_read(ptr & 0xFF00) << 8;
+	if ((temp_addr & 0x00FF) == 0x00FF) {
+		cpu_addr |= cpu_read(temp_addr & 0xFF00) << 8;
 	}
 	else {
-		ptr++;
-		cpu_addr |= (cpu_read(ptr) << 8);
+		//temp_addr++;
+		cpu_addr |= (cpu_read(temp_addr + 1) << 8);
 	}
-	log_word(cpu_addr);
-	log_byte((cpu_addr >> 8) & 0x00FF);
-	log_byte(cpu_addr & 0x00FF);
-	log("\t");
+	log_byte((temp_addr >> 8) & 0x00FF);
+	log_byte(temp_addr & 0x00FF);
+	log(L"\t");
 
 	cpu_operand = cpu_read(cpu_addr);
 	special_set = bus_set;
@@ -599,6 +604,7 @@ void impl() {
 }
 void accum()
 {
+	log(L"\t\t");
 	cpu_operand = cpu_reg.A;
 	special_set = accumulator_set;
 
@@ -633,12 +639,11 @@ void reset_cpu() {
 	cpu_reg.X = 0;
 	cpu_reg.Y = 0;
 	cpu_reg.P = 0;
-	cpu_reg.P |= 1 << RESERVED_FLAG | 1 << ZERO_FLAG | 1 << INTERRUPT_FLAG;
+	cpu_reg.P |= 1 << RESERVED_FLAG | 1 << ZERO_FLAG;
 	cpu_reg.SP = 0xFD;
-	/*cpu_reg.PC.B.l = cpu_read(0xFFFC);
-	cpu_reg.PC.B.h = cpu_read(0xFFFD);*/
-	cpu_reg.PC.W = 0xC000;
-	//cpu_reg.PC.W = 0x0C00;
+	cpu_reg.PC.B.l = cpu_read(0xFFFC);
+	cpu_reg.PC.B.h = cpu_read(0xFFFD);
+	//cpu_reg.PC.W = 0xC000;
 
 	cpu_cycles_num = 8;
 	//Frame period must be added
@@ -656,7 +661,6 @@ void clock_cpu() {
 		cpu_cycles_num = ia.cycles_num;
 
 		ia.mode();
-		ia.instr();
 
 		log(L"\tA:");
 		log_byte(cpu_reg.A);
@@ -669,6 +673,9 @@ void clock_cpu() {
 		log(L"SP:");
 		log_byte(cpu_reg.SP);
 		log_new_line();
+
+		ia.instr();
+
 	}
 	cpu_clock_counter++;
 	

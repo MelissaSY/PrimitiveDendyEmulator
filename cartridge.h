@@ -11,6 +11,12 @@
 //	void (*cart_bus_write)(WORD addr, BYTE data);
 //} cartridge;
 
+typedef enum mirroring {
+	vertical,
+	horizontal,
+	four_screen
+} mirroring;
+
 
 BYTE* PRG;
 BYTE* CHR;

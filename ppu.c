@@ -7,6 +7,9 @@ WORD scan_line = 0;
 
 BOOL is_inserted = FALSE;
 
+BYTE vram[2 * 1024];
+BYTE oam[256];
+
 BYTE pattern_table[2][4*1024];
 BYTE name_table[2][1024];
 BYTE palette_table[32];
@@ -30,22 +33,16 @@ typedef union PPUCTRL {
 
 		//Nametable select
 		BYTE NN : 2;
-
 		//increment mode
 		BYTE I : 1;
-
 		//FG tile select
 		BYTE S : 1;
-
 		//BG tile select
 		BYTE B : 1;
-
 		//sprite height
 		BYTE H : 1;
-
 		//ppu master/slave
 		BYTE P : 1;
-
 		//enable
 		BYTE V : 1;
 	};
@@ -231,13 +228,14 @@ BYTE ppu_bus_read(WORD addr)
 		break;
 		//PPU address
 	case 0x0006:
+
 		break;
 		//PPU data
 	case 0x0007:
 		data = ppu_data_buffer;
 		ppu_data_buffer = ppu_read(ppu_address);
 
-		if (ppu_address > 0x3F00) data = ppu_data_buffer;
+		if (ppu_address >= 0x3F00) data = ppu_data_buffer;
 		ppu_address++;
 		break;
 	}
@@ -283,7 +281,12 @@ void ppu_bus_write(WORD addr, BYTE data)
 		//PPU data
 	case 0x0007:
 		ppu_write(ppu_address, data);
-		ppu_address++;
+		if (control.I == 0) {
+			ppu_address++;
+		}
+		else {
+			ppu_address+=32;
+		}
 		break;
 	}
 }
@@ -346,14 +349,7 @@ void drawpallete(HDC hdc, RECT wnd_rect)
 
 void drawcurrent(HDC hdc, RECT wnd_rect)
 {
-	if (!is_inserted)
-	{
-		drawpallete(hdc, wnd_rect);
-	}
-	else
-	{
-		drawpattern(hdc, wnd_rect, get_pattern_table(0, 7));
-	}
+	drawpallete(hdc, wnd_rect);
 }
 
 
@@ -396,8 +392,6 @@ void ppu_clock()
 	{
 		status.V = 0;
 	}
-
-
 
 	if (scan_line == 241 && cycles_num == 1)
 	{
